@@ -1,0 +1,86 @@
+services:
+  broker:
+    image: apache/kafka:latest
+    container_name: broker
+    hostname: broker
+    ports:
+      - "9092:9092"  # host apps use localhost:9092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093
+      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      # (optional) allow implicit topic creation; we still create explicitly below
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  # one-shot: create the topic if it doesn't exist
+  topic-init:
+    image: apache/kafka:latest
+    depends_on:
+      broker:
+        condition: service_healthy
+    command: >
+      sh -lc " /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker:29092 --create --if-not-exists --topic taxi-locations --partitions 12 --replication-factor 1 "
+    restart: "no"
+
+  # one-shot: feed all files from ./data into Kafka and exit
+  feeder:
+    build: ./producer
+    depends_on:
+      broker:
+        condition: service_healthy
+      topic-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/data:ro
+    environment:
+      BOOTSTRAP: broker:29092
+      TOPIC: taxi-locations
+      # keep if your script reads envs; otherwise flags below rule
+      GLOB: /data/*.txt
+      SPEEDUP: "0"
+      COMPRESSION: lz4
+      LINGER_MS: "50"
+      BATCH_BYTES: "65536"
+      MAX_FILES: "0"
+    # ✅ run python directly; map your current envs to flags your script understands
+    command: [
+      "--glob","/data/*.txt",
+      "--bootstrap","broker:29092",
+      "--topic","taxi-locations",
+      "--compression","lz4",
+      "--linger-ms","80",
+      "--batch-bytes","262144",
+      "--max-files","10",
+      "--pace","0.005",
+    ]
+    restart: "no"  # optional web UI
+
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    depends_on: [broker]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker:29092
+    ports:
+      - "8085:8080"
+    restart: unless-stopped
