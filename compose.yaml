@@ -70,7 +70,7 @@ services:
       "--linger-ms","80",
       "--batch-bytes","262144",
       "--max-files","10",
-      "--pace","0.005",
+      "--pace","0",
     ]
     restart: "no"  # optional web UI
 

@@ -49,6 +49,21 @@ def iter_file(path) -> Iterator[Dict[str, Any]]:
                 yield rec
 
 
+def iter_file_with_eof(path) -> Iterator[Dict[str, Any]]:
+    last = None
+    for rec in iter_file(path):
+        last = rec
+        yield rec
+    # EOF -> emit a sentinel so the merge knows this taxi is done
+    if last is not None:
+        yield {
+            "taxiId": last["taxiId"],
+            # put the stop event *after* the last data ts to keep ordering
+            "ts": last["ts"] + 1,
+            "__eof__": True,
+        }
+
+
 def pick_shard(paths, i, n):
     if n <= 1:
         return paths
@@ -151,7 +166,7 @@ def main():
         print("No files matched for", args.glob, file=sys.stderr)
         sys.exit(1)
 
-    sources = [iter_file(p) for p in files]
+    sources = [iter_file_with_eof(p) for p in files]
     sent = 0
     prev_ts: Optional[int] = None
     pace = float(args.pace)
@@ -173,7 +188,17 @@ def main():
                 producer.begin_transaction()
 
             for rec in batch:
-                producer.send(args.topic, key=rec["taxiId"], value=rec)
+                if rec.get("__eof__"):
+                    stop_evt = {
+                        "taxiId": rec["taxiId"],
+                        "ts": rec["ts"],
+                        "status": "stopped",
+                    }
+                    producer.send(args.topic, key=rec["taxiId"], value=stop_evt)
+                else:
+                    producer.send(args.topic, key=rec["taxiId"], value=rec)
+
+                # producer.send(args.topic, key=rec["taxiId"], value=rec)
                 sent += 1
 
             if args.transactional_id:
