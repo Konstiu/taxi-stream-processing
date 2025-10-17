@@ -70,7 +70,7 @@ services:
       "--linger-ms","80",
       "--batch-bytes","262144",
       "--max-files","10",
-      "--pace","0",
+      "--pace","0.005",
     ]
     restart: "no"  # optional web UI
 
@@ -84,3 +84,92 @@ services:
     ports:
       - "8085:8080"
     restart: unless-stopped
+
+
+
+
+  
+# ================================================================
+  # 🗄️ Optional: Local SQL database (uncomment to enable)
+  # Files expected under ./sql-database/{.env, init/01_schema.sql, loader/loader.sh}
+  # Data files stay in ./data (already mounted above)
+  # ================================================================
+
+#  postgres:
+#    image: postgres:16
+#    restart: unless-stopped
+#    env_file: ./sql-database/.env   # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+#    ports:
+#      - "5432:5432"                  # connect from host via localhost:5432
+#
+#  csv_loader:
+#    image: postgres:16
+#    depends_on:
+#      - postgres
+#    env_file: ./sql-database/.env
+#    volumes:
+#      - ./sql-database/loader/loader.sh:/loader.sh:ro
+#      - ./data:/data:ro
+#    entrypoint: ["bash", "/loader.sh"]
+#    restart: "no"
+
+
+
+    # ==============================#
+    # This is the apache storm      #
+    # ==============================#
+
+  zookeeper:
+    container_name: zookeeper
+    image: zookeeper:3.8
+    ports: ["2181:2181"]
+
+  storm-nimbus:
+    build:
+      context: ./storm
+      dockerfile: Dockerfile
+    container_name: storm-nimbus
+    environment:
+      ROLE: nimbus
+      KAFKA_BROKERS: broker:29092
+      KAFKA_TOPIC: taxi-locations
+      KAFKA_GROUP: storm-taxi
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TTL: 600
+    depends_on:
+      zookeeper:
+        condition: service_started
+      broker:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports: ["6627:6627"]
+
+  storm-supervisor:
+    container_name: storm-supervisor
+    build:
+      context: ./storm
+      dockerfile: Dockerfile
+    environment:
+      ROLE: supervisor
+    depends_on:
+      storm-nimbus:
+        condition: service_started
+
+  storm-ui:
+    container_name: storm-ui
+    build:
+      context: ./storm
+      dockerfile: Dockerfile
+    environment:
+      ROLE: ui
+    depends_on:
+      storm-nimbus:
+        condition: service_started
+    ports: ["8080:8080"]
+
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports: ["6379:6379"]
