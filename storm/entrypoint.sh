@@ -1,16 +1,42 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 ROLE="${ROLE:-nimbus}"
 
+wait_port() {
+	local host="$1" port="$2" label="${3:-$host:$port}"
+	echo "[wait] Waiting for $label ..."
+	for _ in $(seq 1 120); do
+		if (echo >"/dev/tcp/$host/$port") >/dev/null 2>&1; then
+			echo "[wait] $label is up."
+			return 0
+		fi
+		sleep 1
+	done
+	echo "[wait] Timeout waiting for $label" >&2
+	return 1
+}
+
 start_nimbus() {
+	# Start Nimbus
 	storm nimbus &
 	echo "[storm] Nimbus starting..."
-	for i in {1..60}; do
-		nc -z 127.0.0.1 6627 && break || sleep 1
-	done
+
+	# Wait for Nimbus Thrift (6627)
+	wait_port 127.0.0.1 6627 "Nimbus (localhost:6627)"
+
+	# Optionally wait for Kafka if KAFKA_BROKERS is provided, e.g. broker:29092
+	if [[ -n "${KAFKA_BROKERS:-}" ]]; then
+		KAFKA_HOST="${KAFKA_BROKERS%%:*}"
+		KAFKA_PORT="${KAFKA_BROKERS##*:}"
+		wait_port "$KAFKA_HOST" "$KAFKA_PORT" "Kafka ($KAFKA_HOST:$KAFKA_PORT)"
+	fi
+
+	# Submit topology JAR (produced by maven-shade-plugin as /topology.jar)
 	echo "[storm] Submitting topology..."
 	storm jar /topology.jar com.example.TaxiTopology taxi-topo || true
+
+	# Keep container alive with Nimbus
 	wait
 }
 
