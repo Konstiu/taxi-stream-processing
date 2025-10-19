@@ -10,3 +10,11 @@ services:
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093
+
+  storm-nimbus:
+    image: storm:2.6.1
+    command: storm nimbus
+  storm-ui:
+    image: storm:2.6.1
+    command: storm ui
+    ports: ["8080:8080"]
