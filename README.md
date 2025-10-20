@@ -26,6 +26,7 @@ Kafka can be viewed from the Internet with the URL http://localhost:8085/
 On storm, you can view live data updates with the command: 
 ~~~
 docker exec -it redis redis-cli hgetall taxi:100:state
+docker exec -it redis redis-cli lrange taxi:100:track 0 5
 ~~~
 this looks at the live data of taxi with id 100
 <img width="944" height="501" alt="image" src="https://github.com/user-attachments/assets/010e0876-019d-42bf-82d1-7b111f6ac28f" />
