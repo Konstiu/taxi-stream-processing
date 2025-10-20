@@ -93,22 +93,24 @@ public class TaxiTopology {
 
         @Override
         public void execute(Tuple t) {
-            try (Jedis jedis = pool.getResource()) {
+            try (Jedis jedis = pool.getResource()){ 
                 String taxiId = t.getStringByField("taxiId");
                 long ts = t.getLongByField("ts");
                 double lat = t.getDoubleByField("lat");
                 double lon = t.getDoubleByField("lon");
                 double speedKmh = t.getFields().contains("speedKmh") ? t.getDoubleByField("speedKmh") : 0.0;
+				double distMeters = t.getFields().contains("meters_since_last") ? t.getDoubleByField("meters_since_last") : 0.0;
                 String key = "taxi:" + taxiId + ":state";
                 jedis.hset(key, Map.of(
                         "ts", String.valueOf(ts),
                         "lat", String.valueOf(lat),
                         "lon", String.valueOf(lon),
-                        "speed_kmh", String.valueOf(speedKmh)
+                        "speed_kmh", String.valueOf(speedKmh),
+						"meters_since_last", String.valueOf(distMeters)
                 ));
                 if (ttl > 0) jedis.expire(key, ttl);
                 jedis.geoadd("taxis:geo", lon, lat, taxiId);
-                jedis.lpush("taxi:" + taxiId + ":track", ts + "," + lat + "," + lon + "," + speedKmh);
+                jedis.lpush("taxi:" + taxiId + ":track", ts + "," + lat + "," + lon + "," + speedKmh + "," + distMeters);
                 jedis.ltrim("taxi:" + taxiId + ":track", 0, 99);
                 collector.ack(t);
             } catch (Exception e) {
@@ -155,13 +157,12 @@ public class TaxiTopology {
 
             double speedKmh = 0.0; // default when we don’t have a previous point
             Fix prev = this.last.get(taxiId);
+			double distMeters = 0.0;
 			
-			LOG.info("Time delta (ms): hioiiiiiiiier asdfadsf ++++++++++++++++++++~~~~~~~~~~~~~~~");
             if (prev != null) {
                 long dtMillis = ts - prev.ts;
-				LOG.info("Time delta (ms): " + dtMillis);
                 if (dtMillis > 0) {
-                    double distMeters = haversineMeters(prev.lat, prev.lon, lat, lon); // distance
+                    distMeters = haversineMeters(prev.lat, prev.lon, lat, lon); // distance
                     double dtHours = (dtMillis / 1000.0) / 3600.0;                      // time
                     double km = distMeters / 1000.0;
                     speedKmh = km / dtHours;
@@ -174,12 +175,12 @@ public class TaxiTopology {
             last.put(taxiId, new Fix(ts, lat, lon));
 
             // emit downstream with speed
-            out.emit(new Values(taxiId, ts, lat, lon, speedKmh));
+            out.emit(new Values(taxiId, ts, lat, lon, speedKmh, distMeters));
         }
 
         @Override
         public void declareOutputFields(OutputFieldsDeclarer d) {
-            d.declare(new Fields("taxiId", "ts", "lat", "lon", "speedKmh"));
+            d.declare(new Fields("taxiId", "ts", "lat", "lon", "speedKmh", "meters_since_last"));
         }
 
         // ✅ Haversine distance in meters
@@ -194,7 +195,7 @@ public class TaxiTopology {
             return R * c;
         }
     }
-
+}
 
     // ✅ Topology Entry Point
     public static void main(String[] args) throws Exception {
