@@ -117,7 +117,16 @@ public class TaxiTopology {
                 if (crossed10) {
                     jedis.lpush("alerts", "left_area_10km,"+taxiId+","+ts+","+distKm);
                 }
+                // Running distance (inside 15 km only)
+                if (!outside15 && distMeters > 0.0) {
+                    jedis.hincrByFloat(key, "distance_km_total", distMeters / 1000.0);
+                }
 
+                // Speeding alert once (>50 km/h)
+                if (speedKmh > 50.0 && jedis.setnx("alert:speed:"+taxiId, "1") == 1) {
+                    jedis.lpush("alerts", "speeding,"+taxiId+","+ts+","+speedKmh);
+                    jedis.expire("alert:speed:"+taxiId, 3600); // optional cooldown
+                }
                 // 2) store state (always), but control what the dashboard reads
                 jedis.hset(key, Map.of(
                         "ts", String.valueOf(ts),
@@ -138,7 +147,6 @@ public class TaxiTopology {
                     // optionally remove it if it was on the map before
                     jedis.zrem("taxis:geo", taxiId);
                 }
-                jedis.geoadd("taxis:geo", lon, lat, taxiId);
                 jedis.lpush("taxi:" + taxiId + ":track", ts + "," + lat + "," + lon + "," + speedKmh + "," + distMeters);
                 jedis.ltrim("taxi:" + taxiId + ":track", 0, 99);
                 collector.ack(t);
