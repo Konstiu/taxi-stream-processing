@@ -34,7 +34,7 @@ start_nimbus() {
 
 	# Submit topology JAR (produced by maven-shade-plugin as /topology.jar)
 	echo "[storm] Submitting topology..."
-	storm jar /topology.jar com.example.TaxiTopology taxi-topo || true
+	storm jar /topology.jar main.java.com.example.TaxiTopology taxi-topo || true
 
 	# Keep container alive with Nimbus
 	wait
