@@ -6,3 +6,4 @@ public class TaxiTopology {
     }
 }
 // Added SpeedBolt logic
+// Added AverageSpeedBolt
