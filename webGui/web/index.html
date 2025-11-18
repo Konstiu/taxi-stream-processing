@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Taxi Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="/" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🚖 Taxi Monitor</div>
+    <div class="actions">
+      <div class="input-group">
+        <label for="ids">Taxi IDs</label>
+        <input id="ids" type="text" placeholder="e.g. 100,10001,10004" value="100" />
+      </div>
+      <div class="input-group">
+        <label for="interval">Refresh (s)</label>
+        <input id="interval" type="number" min="1" value="1" />
+      </div>
+      <button id="apply">Apply</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Live Taxis</h2>
+        <div class="sub">Color shows proximity to center: green &lt;= 10 km, amber 10–15 km, red &gt; 15 km.</div>
+      </div>
+      <div id="taxis" class="card-grid"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Alerts</h2>
+        <div class="sub">Streaming from <code>LRANGE alerts 0 -1</code> (latest first)</div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Taxi</th>
+              <th>Type</th>
+              <th>Value</th>
+              <th class="hide-sm">Raw</th>
+            </tr>
+          </thead>
+          <tbody id="alertsBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="status">Ready</span>
+  </footer>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
