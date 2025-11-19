@@ -1,4 +1,4 @@
-package main.java.com.example;
+package com.example;
 
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.storm.Config;
@@ -22,9 +22,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-import static main.java.com.example.TaxiTopology.SpeedBolt.FC_LAT;
-import static main.java.com.example.TaxiTopology.SpeedBolt.FC_LON;
-import static main.java.com.example.TaxiTopology.SpeedBolt.haversineMeters;
+import static com.example.TaxiTopology.SpeedBolt.FC_LAT;
+import static com.example.TaxiTopology.SpeedBolt.FC_LON;
+import static com.example.TaxiTopology.SpeedBolt.haversineMeters;
 
 public class TaxiTopology {
 

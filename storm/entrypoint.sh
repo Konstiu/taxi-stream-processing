@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROLE="${ROLE:-nimbus}"
 
-wait_port() {
+wait_port() { 
 	local host="$1" port="$2" label="${3:-$host:$port}"
 	echo "[wait] Waiting for $label ..."
 	for _ in $(seq 1 120); do
@@ -34,7 +34,7 @@ start_nimbus() {
 
 	# Submit topology JAR (produced by maven-shade-plugin as /topology.jar)
 	echo "[storm] Submitting topology..."
-	storm jar /topology.jar main.java.com.example.TaxiTopology taxi-topo || true
+	storm jar /topology.jar com.example.TaxiTopology taxi-topo || true
 
 	# Keep container alive with Nimbus
 	wait
