@@ -70,7 +70,7 @@ services:
       "--linger-ms","80",
       "--batch-bytes","262144",
       "--max-files","10",
-      "--pace","0.005",
+      "--pace","0.001",
     ]
     restart: "no"  # optional web UI
 
@@ -173,3 +173,25 @@ services:
     container_name: redis
     image: redis:7-alpine
     ports: ["6379:6379"]
+
+
+
+    #############################
+    #                           #
+    #     For Web GUI           #
+    #                           #
+    #############################
+
+  api:
+    build: ./webGui/api/
+    container_name: redis_dashboard_api
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on: [redis]
+    ports: ["8000:8000"]
+  
+  web:
+    build: ./webGui/web
+    container_name: redis_dashboard_web
+    depends_on: [api]
+    ports: ["800:80"]
