@@ -1,23 +1,197 @@
 services:
-  zookeeper:
-    image: zookeeper:3.8
-    ports: ["2181:2181"]
   broker:
     image: apache/kafka:latest
-    ports: ["9092:9092"]
+    container_name: broker
+    hostname: broker
+    ports:
+      - "9092:9092"  # host apps use localhost:9092
     environment:
-      KAFKA_NODE_ID: 1
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@broker:29093
+      KAFKA_LISTENERS: PLAINTEXT://broker:29092,CONTROLLER://broker:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      # (optional) allow implicit topic creation; we still create explicitly below
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  # one-shot: create the topic if it doesn't exist
+  topic-init:
+    image: apache/kafka:latest
+    depends_on:
+      broker:
+        condition: service_healthy
+    command: >
+      sh -lc " /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker:29092 --create --if-not-exists --topic taxi-locations --partitions 12 --replication-factor 1 "
+    restart: "no"
+
+  # one-shot: feed all files from ./data into Kafka and exit
+  feeder:
+    build: ./producer
+    depends_on:
+      broker:
+        condition: service_healthy
+      topic-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/data:ro
+    environment:
+      BOOTSTRAP: broker:29092
+      TOPIC: taxi-locations
+      # keep if your script reads envs; otherwise flags below rule
+      GLOB: /data/*.txt
+      SPEEDUP: "0"
+      COMPRESSION: lz4
+      LINGER_MS: "50"
+      BATCH_BYTES: "65536"
+      MAX_FILES: "0"
+    # ✅ run python directly; map your current envs to flags your script understands
+    command: [
+      "--glob","/data/*.txt",
+      "--bootstrap","broker:29092",
+      "--topic","taxi-locations",
+      "--compression","lz4",
+      "--linger-ms","80",
+      "--batch-bytes","262144",
+      "--max-files","10",
+      "--pace","0.001",
+    ]
+    restart: "no"  # optional web UI
+
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    depends_on: [broker]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker:29092
+    ports:
+      - "8085:8080"
+    restart: unless-stopped
+
+
+
+
+  
+# ================================================================
+  # 🗄️ Optional: Local SQL database (uncomment to enable)
+  # Files expected under ./sql-database/{.env, init/01_schema.sql, loader/loader.sh}
+  # Data files stay in ./data (already mounted above)
+  # ================================================================
+
+#  postgres:
+#    image: postgres:16
+#    restart: unless-stopped
+#    env_file: ./sql-database/.env   # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+#    ports:
+#      - "5432:5432"                  # connect from host via localhost:5432
+#
+#  csv_loader:
+#    image: postgres:16
+#    depends_on:
+#      - postgres
+#    env_file: ./sql-database/.env
+#    volumes:
+#      - ./sql-database/loader/loader.sh:/loader.sh:ro
+#      - ./data:/data:ro
+#    entrypoint: ["bash", "/loader.sh"]
+#    restart: "no"
+
+
+
+    # ==============================#
+    # This is the apache storm      #
+    # ==============================#
+
+  zookeeper:
+    container_name: zookeeper
+    image: zookeeper:3.8
+    ports: ["2181:2181"]
 
   storm-nimbus:
-    image: storm:2.6.1
-    command: storm nimbus
+    build:
+      context: ./storm
+      dockerfile: Dockerfile
+    container_name: storm-nimbus
+    environment:
+      ROLE: nimbus
+      KAFKA_BROKERS: broker:29092
+      KAFKA_TOPIC: taxi-locations
+      KAFKA_GROUP: storm-taxi
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TTL: 600
+    depends_on:
+      zookeeper:
+        condition: service_started
+      broker:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports: ["6627:6627"]
+
+  storm-supervisor:
+    container_name: storm-supervisor
+    build:
+      context: ./storm
+      dockerfile: Dockerfile
+    environment:
+      ROLE: supervisor
+    depends_on:
+      storm-nimbus:
+        condition: service_started
+
   storm-ui:
-    image: storm:2.6.1
-    command: storm ui
+    container_name: storm-ui
+    build:
+      context: ./storm
+      dockerfile: Dockerfile
+    environment:
+      ROLE: ui
+    depends_on:
+      storm-nimbus:
+        condition: service_started
     ports: ["8080:8080"]
+
   redis:
+    container_name: redis
     image: redis:7-alpine
     ports: ["6379:6379"]
+
+
+
+    #############################
+    #                           #
+    #     For Web GUI           #
+    #                           #
+    #############################
+
+  api:
+    build: ./webGui/api/
+    container_name: redis_dashboard_api
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on: [redis]
+    ports: ["8000:8000"]
+  
+  web:
+    build: ./webGui/web
+    container_name: redis_dashboard_web
+    depends_on: [api]
+    ports: ["800:80"]
