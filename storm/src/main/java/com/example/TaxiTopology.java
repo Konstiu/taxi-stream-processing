@@ -17,9 +17,6 @@ import redis.clients.jedis.JedisPoolConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.Map;
 
 import static com.example.TaxiTopology.SpeedBolt.FC_LAT;
@@ -222,18 +219,8 @@ public class TaxiTopology {
 
     // ✅ Compute speed between consecutive GPS fixes
     public static class SpeedBolt extends BaseBasicBolt {
-        // previous state per taxiId (in-memory)
-		private static final Logger LOG = LoggerFactory.getLogger(SpeedBolt.class);
-        private static class Fix {
-            final long ts;
-            final double lat;
-            final double lon;
 
-            Fix(long ts, double lat, double lon) {
-                this.ts = ts;
-                this.lat = lat;
-                this.lon = lon;
-            }
+        private record Fix(long ts, double lat, double lon) {
         }
 
         private transient Map<String, Fix> last;
@@ -304,7 +291,7 @@ public class TaxiTopology {
         int redisTtl = Integer.parseInt(System.getenv().getOrDefault("REDIS_TTL", "600"));
 
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("kafka-spout", TaxiTopology.buildKafkaSpout(brokers, topic, group), 1);
+        builder.setSpout("kafka-spout", TaxiTopology.buildKafkaSpout(brokers, topic, group), 6);
         builder.setBolt("parse-json", new TaxiTopology.ParseJsonBolt(), 2).shuffleGrouping("kafka-spout");
         builder.setBolt("compute-speed", new TaxiTopology.SpeedBolt(), 2).fieldsGrouping("parse-json", new Fields("taxiId"));
         builder.setBolt("avg-speed", new TaxiTopology.AverageSpeedBolt(), 2)
@@ -314,7 +301,8 @@ public class TaxiTopology {
 
 
         Config config = new Config();
-        config.setNumWorkers(1);
+        config.setNumWorkers(2);
+        config.setMaxTaskParallelism(14);
         config.setMessageTimeoutSecs(120);
         StormSubmitter.submitTopology("taxi-topo", config, builder.createTopology());
     }
