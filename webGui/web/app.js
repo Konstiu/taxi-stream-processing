@@ -10,7 +10,7 @@ let refreshHandle = null;
 const qs = (s, el=document) => el.querySelector(s);
 const qsa = (s, el=document) => [...el.querySelectorAll(s)];
 
-const kmfmt = (n) => (n == null || Number.isNaN(+n)) ? "—" : (+n).toFixed(3);
+const kmfmt = (n) => (n == null || Number.isNaN(+n)) ? "—" : (+n).toFixed(5);
 const spdfmt = (n) => (n == null || Number.isNaN(+n)) ? "—" : (+n).toFixed(1);
 const tsfmt = (t) => {
   if (!t) return "—";
