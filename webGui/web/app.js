@@ -173,6 +173,66 @@ function renderAlerts(items) {
   });
 }
 
+// ---------- Notifications ----------
+function showNotification(msg) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const el = document.createElement('div');
+  el.className = 'toast';
+  
+  // Simple parsing to determine type for styling
+  if (msg.includes('speeding')) el.classList.add('speeding');
+  if (msg.includes('left_area')) el.classList.add('left_area');
+
+  el.innerHTML = `<strong>New Alert!</strong><br>${msg}`;
+  container.appendChild(el);
+
+  // Auto remove
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, 5000);
+}
+
+let ws = null;
+
+function connectWs() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/api/ws/alerts`;
+  console.log("Connecting to WS:", wsUrl);
+  
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    console.log("WS Connected");
+    const wsStatus = qs('#ws-status');
+    if (wsStatus) wsStatus.textContent = "WS: Connected 🟢";
+  };
+
+  ws.onmessage = (event) => {
+    console.log("WS Message:", event.data);
+    showNotification(event.data);
+    loadAlerts(); 
+  };
+
+  ws.onerror = (err) => {
+    console.error("WS Error:", err);
+    const wsStatus = qs('#ws-status');
+    if (wsStatus) wsStatus.textContent = "WS: Error 🔴";
+  };
+
+  ws.onclose = () => {
+    console.log("WS Closed, retrying...");
+    const wsStatus = qs('#ws-status');
+    if (wsStatus) wsStatus.textContent = "WS: Reconnecting... 🟠";
+    ws = null;
+    setTimeout(connectWs, 5000);
+  };
+}
+
 // ---------- Main Loop ----------
 function getIds() {
   const input = qs('#ids'); // Hidden or visible input depending on design
@@ -185,6 +245,7 @@ function getIds() {
 
 async function init() {
   initMap();
+  connectWs();
   await refreshAll();
 
   // Apply button and Loop configuration
