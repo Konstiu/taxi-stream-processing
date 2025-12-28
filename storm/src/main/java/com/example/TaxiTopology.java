@@ -115,7 +115,9 @@ public class TaxiTopology {
 
                 // 1) raise one-time alert when crossing 10km
                 if (crossed10) {
-                    jedis.lpush("alerts", "left_area_10km,"+taxiId+","+ts+","+distKm);
+                    String msg = "left_area_10km,"+taxiId+","+ts+","+distKm;
+                    jedis.lpush("alerts", msg);
+                    jedis.publish("alerts_channel", msg);
                 }
                 // Running distance (inside 15 km only)
                 if (!outside15 && distMeters > 0.0) {
@@ -124,7 +126,9 @@ public class TaxiTopology {
 
                 // Speeding alert once (>50 km/h)
                 if (speedKmh > 50.0 && jedis.setnx("alert:speed:"+taxiId, "1") == 1) {
-                    jedis.lpush("alerts", "speeding,"+taxiId+","+ts+","+speedKmh);
+                    String msg = "speeding,"+taxiId+","+ts+","+speedKmh;
+                    jedis.lpush("alerts", msg);
+                    jedis.publish("alerts_channel", msg);
                     jedis.expire("alert:speed:"+taxiId, 3600); // optional cooldown
                 }
                 // 2) store state (always), but control what the dashboard reads

@@ -1,6 +1,6 @@
 import os, time
 from typing import Any, Dict, List
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 import redis.asyncio as redis
 
@@ -64,3 +64,23 @@ async def get_alerts(start: int = Query(0), stop: int = Query(-1)):
         else:
             parsed.append({"raw": s})
     return JSONResponse({"items": parsed, "count": len(items)})
+
+
+@app.websocket("/ws/alerts")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("DEBUG: WS Client connected", flush=True)
+    pubsub = r.pubsub()
+    await pubsub.subscribe("alerts_channel")
+    print("DEBUG: Subscribed to alerts_channel", flush=True)
+    try:
+        async for message in pubsub.listen():
+            # print(f"DEBUG: Redis raw msg: {message}", flush=True)
+            if message["type"] == "message":
+                print(f"DEBUG: Sending to WS: {message['data']}", flush=True)
+                await websocket.send_text(message["data"])
+    except Exception as e:
+        print(f"DEBUG: WS Error: {e}", flush=True)
+    finally:
+        await pubsub.unsubscribe("alerts_channel")
+        print("DEBUG: WS Client disconnected", flush=True)

@@ -126,6 +126,64 @@ function renderAlerts(items) {
   }
 }
 
+// ---------- Notifications ----------
+function showNotification(msg) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const el = document.createElement('div');
+  el.className = 'toast';
+  
+  // Simple parsing to determine type for styling
+  if (msg.includes('speeding')) el.classList.add('speeding');
+  if (msg.includes('left_area')) el.classList.add('left_area');
+
+  el.innerHTML = `<strong>New Alert!</strong><br>${msg}`;
+  container.appendChild(el);
+
+  // Auto remove
+  setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => el.remove(), 300);
+  }, 5000);
+}
+
+let ws = null;
+
+function connectWs() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/api/ws/alerts`;
+  console.log("Connecting to WS:", wsUrl);
+  
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    console.log("WS Connected");
+    // showNotification("System: Connected to Alerts"); // Removed to avoid spam
+    qs('#ws-status').textContent = "WS: Connected 🟢";
+  };
+
+  ws.onmessage = (event) => {
+    console.log("WS Message:", event.data);
+    showNotification(event.data);
+    loadAlerts(); 
+  };
+
+  ws.onerror = (err) => {
+    console.error("WS Error:", err);
+    qs('#ws-status').textContent = "WS: Error 🔴";
+  };
+
+  ws.onclose = () => {
+    console.log("WS Closed, retrying...");
+    qs('#ws-status').textContent = "WS: Reconnecting... 🟠";
+    ws = null;
+    setTimeout(connectWs, 5000);
+  };
+}
+
 // ---------- Controls & Loop ----------
 function getIds() {
   return qs('#ids').value.split(',').map(s => s.trim()).filter(Boolean);
@@ -136,6 +194,7 @@ function setStatus(msg) {
 }
 
 async function init() {
+  connectWs();
   const ids = getIds();
   await renderTaxis(ids);
   await loadAlerts();
