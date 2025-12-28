@@ -4,63 +4,74 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 import redis.asyncio as redis
 
-
+# Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 r = redis.from_url(REDIS_URL, decode_responses=True)
 
 app = FastAPI(title="Redis Dashboard API")
 
-
-# --- EXACT MAPPINGS ---
-# 1) docker exec -it redis redis-cli hgetall taxi:{id}:state
+# --- TAXI STATE ENDPOINT ---
 @app.get("/taxi/{taxi_id}")
 async def get_taxi_state(taxi_id: str):
-    key = f"taxi:{taxi_id}:state"
-    h = await r.hgetall(key)  # exact HGETALL
+    # 1. ID cleanup: Remove 'taxi:' if included to avoid duplicates
+    clean_id = taxi_id.replace("taxi:", "")
+    
+    # 2. Build the correct key (e.g.: taxi:100:state)
+    key = f"taxi:{clean_id}:state"
+    
+    # 3. Query Redis
+    h = await r.hgetall(key)
+    
     if not h:
+        # Debug log for docker logs
+        print(f"DEBUG: Key '{key}' not found in Redis") 
         raise HTTPException(404, f"No hash at {key}")
-    # optional: parse a few fields for nicer UI
+
+    # 4. Response formatting
     out: Dict[str, Any] = {k: v for k, v in h.items()}
     ts = out.get("ts")
     try:
-        tsf = (
-            int(ts) / 1000.0
-            if ts and len(ts) > 10
-            else float(ts)
-            if ts
-            else time.time()
-        )
+        # Try to detect if it's milliseconds or seconds
+        ts_val = float(ts) if ts else time.time()
+        tsf = ts_val / 1000.0 if ts_val > 1e11 else ts_val
     except:
         tsf = time.time()
+        
     out["_ts_readable"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(tsf))
     return JSONResponse(out)
 
-
-# 2) docker exec -it redis redis-cli lrange alerts 0 -1
+# --- ALERTS ENDPOINT ---
 @app.get("/alerts")
 async def get_alerts(start: int = Query(0), stop: int = Query(-1)):
     key = "alerts"
-    items: List[str] = await r.lrange(key, start, stop)  # exact LRANGE
-    # optional: structured parse for UI convenience
+    # Read the alerts list (LIFO - Last In First Out normally)
+    items: List[str] = await r.lrange(key, start, stop)
+    
     parsed = []
     for s in items:
+        # Expected format: "type,taxi_id,ts,value"
         parts = s.split(",")
-        if len(parts) == 4:
-            typ, taxi_id, ts_ms, value = parts
+        if len(parts) >= 4:
+            typ = parts[0]
+            taxi_id = parts[1]
+            ts_raw = parts[2]
+            value = parts[3]
+            
             try:
-                ts = int(ts_ms) / 1000.0
+                ts_val = float(ts_raw)
+                ts = ts_val / 1000.0 if ts_val > 1e11 else ts_val
             except:
                 ts = time.time()
-            parsed.append(
-                {
-                    "raw": s,
-                    "type": typ,
-                    "taxi_id": taxi_id,
-                    "timestamp": ts,
-                    "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)),
-                    "value": value,
-                }
-            )
+                
+            parsed.append({
+                "raw": s,
+                "type": typ,
+                "taxi_id": taxi_id,
+                "timestamp": ts,
+                "time": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)),
+                "value": value,
+            })
         else:
             parsed.append({"raw": s})
+            
     return JSONResponse({"items": parsed, "count": len(items)})
