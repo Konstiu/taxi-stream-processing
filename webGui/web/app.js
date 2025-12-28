@@ -1,38 +1,85 @@
-// ---------- Config ----------
+// ---------- Configuration ----------
 const api = {
   taxi: (id) => `/api/taxi/${encodeURIComponent(id)}`,
-  alerts: (order = 'desc', limit = 200) => `/api/alerts?order=${order}&limit=${limit}`
+  alerts: (order = 'desc', limit = 50) => `/api/alerts?order=${order}&limit=${limit}`
 };
 
+// Default IDs to display something immediately (Demo)
+const DEFAULT_IDS = ["100", "10002", "10004", "200"]; 
 let refreshHandle = null;
 
 // ---------- Utilities ----------
-const qs = (s, el=document) => el.querySelector(s);
-const qsa = (s, el=document) => [...el.querySelectorAll(s)];
+const qs = (s, el = document) => el.querySelector(s);
 
 const kmfmt = (n) => (n == null || Number.isNaN(+n)) ? "—" : (+n).toFixed(3);
 const spdfmt = (n) => (n == null || Number.isNaN(+n)) ? "—" : (+n).toFixed(1);
 const tsfmt = (t) => {
   if (!t) return "—";
-  // /taxi returns ISO at _ts_iso_utc if you added it; fall back to epoch seconds/ms
   try {
-    if (typeof t === 'string' && t.includes('T')) return new Date(t).toLocaleString();
+    if (typeof t === 'string' && t.includes('T')) return new Date(t).toLocaleTimeString();
     const num = +t;
-    return new Date(num > 1e12 ? num : num * 1000).toLocaleString();
+    return new Date(num > 1e12 ? num : num * 1000).toLocaleTimeString();
   } catch { return "—"; }
 };
 
 const statusForDist = (d) => {
   const dist = +d || 0;
-  if (dist > 15) return { cls: 'disc', label: 'DISCARD' };
-  if (dist > 10) return { cls: 'warn', label: 'WARN' };
-  return { cls: 'ok', label: 'OK' };
+  if (dist > 15) return { cls: 'disc', label: 'DISCARD (>15km)' };
+  if (dist > 10) return { cls: 'warn', label: 'WARN (10-15km)' };
+  return { cls: 'ok', label: 'OK (<10km)' };
 };
 
-// ---------- Taxi Cards ----------
+// ---------- MAP LOGIC (Leaflet) ----------
+let map = null;
+const markers = {}; // Cache: { id: LeafletMarker }
+const FC_COORDS = [39.9163, 116.3972]; // Forbidden City
+
+function initMap() {
+  if (map) return;
+
+  // 1. Create map
+  map = L.map('map-container').setView(FC_COORDS, 13);
+
+  // 2. OpenStreetMap base layer
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  // 3. Geofence circles (SpeedBolt logic visualization)
+  L.circle(FC_COORDS, { color: '#f59e0b', fill: false, weight: 2, dashArray: '5, 5', radius: 10000 }).addTo(map);
+  L.circle(FC_COORDS, { color: '#ef4444', fill: false, weight: 2, dashArray: '5, 5', radius: 15000 }).addTo(map);
+}
+
+function updateMarker(id, data) {
+  if (!map) return;
+
+  // Try to read lat/lon in various possible ways for robustness
+  const lat = parseFloat(data.lat || data.latitude);
+  const lon = parseFloat(data.lon || data.longitude);
+  const speed = parseFloat(data.speed_kmh || data.speed || 0);
+
+  // If coordinates are not valid, do nothing
+  if (isNaN(lat) || isNaN(lon)) return;
+
+  const st = statusForDist(data.dist_km_center);
+
+  if (markers[id]) {
+    // UPDATE: Move existing marker
+    markers[id].setLatLng([lat, lon]);
+    markers[id].setPopupContent(`<b>Taxi ${id}</b><br>${st.label}<br>Speed: ${speed.toFixed(1)} km/h`);
+  } else {
+    // CREATE: New marker
+    const m = L.marker([lat, lon]).addTo(map);
+    m.bindPopup(`<b>Taxi ${id}</b><br>${st.label}<br>Speed: ${speed.toFixed(1)} km/h`);
+    markers[id] = m;
+  }
+}
+
+// ---------- API & UI ----------
 async function fetchTaxi(id) {
   const res = await fetch(api.taxi(id));
-  if (!res.ok) throw new Error(`Taxi ${id} not found`);
+  if (!res.ok) throw new Error(`Taxi ${id} missing`);
   return res.json();
 }
 
@@ -45,112 +92,115 @@ function taxiCardDOM(id, data) {
   const card = document.createElement('div');
   card.className = `card ${st.cls}`;
   card.id = `taxi-${id}`;
+  
   card.innerHTML = `
     <div class="title">
       <span class="dot ${st.cls}"></span>
       <span>taxi:${id}</span>
-      <span class="badge">${data.lat ?? "?"}, ${data.lon ?? "?"}</span>
-      <span class="badge">${data._ts_iso_utc ? new Date(data._ts_iso_utc).toLocaleTimeString() : tsfmt(data.ts)}</span>
+      <span class="badge time">${tsfmt(data.ts)}</span>
     </div>
-
     <div class="metrics">
-      <div class="kv"><div class="k">Distance to center</div><div class="v">${kmfmt(dist)} km</div></div>
-      <div class="kv"><div class="k">Status</div><div class="v">${st.label}</div></div>
+      <div class="kv"><div class="k">Dist. Center</div><div class="v">${kmfmt(dist)} km</div></div>
       <div class="kv"><div class="k">Speed</div><div class="v">${spdfmt(speed)} km/h</div></div>
-      <div class="kv"><div class="k">Avg speed</div><div class="v">${spdfmt(avg)} km/h</div></div>
-      <div class="kv"><div class="k">Meters since last</div><div class="v">${spdfmt(data.meters_since_last)} m</div></div>
-      <div class="kv"><div class="k">Total distance</div><div class="v">${kmfmt(data.distance_km_total)} km</div></div>
-    </div>
-
-    <div class="badges">
-      <span class="badge">outside_15km: ${String(data.outside_15km)}</span>
-      <span class="badge">ts: ${data.ts ?? "—"}</span>
+      <div class="kv"><div class="k">Avg (Window)</div><div class="v">${spdfmt(avg)} km/h</div></div>
+      <div class="kv"><div class="k">Total Dist</div><div class="v">${kmfmt(data.distance_km_total)} km</div></div>
     </div>
   `;
   return card;
 }
 
-async function renderTaxis(ids) {
-  const wrap = qs('#taxis');
-  wrap.innerHTML = '';
-  const jobs = ids.map(async (id) => {
+async function refreshAll() {
+  const ids = getIds();
+  
+  // 1. Taxis
+  const taxiJobs = ids.map(async (id) => {
     try {
       const data = await fetchTaxi(id);
-      wrap.appendChild(taxiCardDOM(id, data));
+      
+      // Update DOM
+      const wrap = qs('#taxis');
+      if (wrap) {
+        const old = qs(`#taxi-${id}`, wrap);
+        const fresh = taxiCardDOM(id, data);
+        old ? wrap.replaceChild(fresh, old) : wrap.appendChild(fresh);
+      }
+
+      // Update Map
+      updateMarker(id, data);
+
     } catch (e) {
-      const err = document.createElement('div');
-      err.className = 'card';
-      err.innerHTML = `<div class="title"><span class="dot disc"></span><span>taxi:${id}</span></div>
-        <div class="sub">Not found or error.</div>`;
-      wrap.appendChild(err);
+      // If it fails, clean up map marker if it exists
+      if (markers[id]) {
+        map.removeLayer(markers[id]);
+        delete markers[id];
+      }
     }
   });
-  await Promise.allSettled(jobs);
-}
 
-async function refreshTaxis(ids) {
-  const wrap = qs('#taxis');
-  const jobs = ids.map(async (id) => {
-    try {
-      const data = await fetchTaxi(id);
-      const old = qs(`#taxi-${id}`, wrap);
-      const fresh = taxiCardDOM(id, data);
-      old ? wrap.replaceChild(fresh, old) : wrap.appendChild(fresh);
-    } catch {/* ignore individual errors */}
-  });
-  await Promise.allSettled(jobs);
+  // 2. Alertas
+  const alertJob = loadAlerts();
+
+  await Promise.all([...taxiJobs, alertJob]);
 }
 
 // ---------- Alerts ----------
 async function loadAlerts() {
-  const res = await fetch(api.alerts('desc', 200));
-  const { items } = await res.json();
-  renderAlerts(items || []);
+  try {
+    const res = await fetch(api.alerts('desc', 20));
+    const data = await res.json();
+    renderAlerts(data.items || []);
+  } catch (e) { console.error(e); }
 }
 
 function renderAlerts(items) {
-  const body = qs('#alertsBody');
-  body.innerHTML = '';
-  for (const a of items) {
-    const tr = document.createElement('tr');
-    const cls = a.type === 'speeding' ? 'type-speeding' :
-                a.type === 'left_area_10km' ? 'type-left' : '';
-    tr.innerHTML = `
-      <td>${a.time ?? tsfmt(a.timestamp)}</td>
-      <td>taxi:${a.taxi_id ?? ''}</td>
-      <td><span class="type-badge ${cls}">${a.type}</span></td>
-      <td>${a.value ?? ''}</td>
-      <td class="hide-sm"><code>${a.raw ?? ''}</code></td>
+  const list = qs('#alerts-list');
+  if (!list) return;
+  list.innerHTML = '';
+  
+  items.forEach(a => {
+    const li = document.createElement('li');
+    li.className = 'alert-item';
+    const typeClass = a.type === 'speeding' ? 'tag-red' : 'tag-amber';
+    li.innerHTML = `
+      <div class="alert-time">${tsfmt(a.timestamp)}</div>
+      <div class="alert-content">
+        <strong>taxi:${a.taxi_id}</strong>
+        <span class="tag ${typeClass}">${a.type}</span>
+        <span class="alert-val">${a.value ? parseFloat(a.value).toFixed(2) : ''}</span>
+      </div>
     `;
-    body.appendChild(tr);
-  }
+    list.appendChild(li);
+  });
 }
 
-// ---------- Controls & Loop ----------
+// ---------- Main Loop ----------
 function getIds() {
-  return qs('#ids').value.split(',').map(s => s.trim()).filter(Boolean);
-}
-
-function setStatus(msg) {
-  qs('#status').textContent = msg;
+  const input = qs('#ids'); // Hidden or visible input depending on design
+  // If there is no input or it is empty, use the defaults
+  if (input && input.value.trim()) {
+      return input.value.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return DEFAULT_IDS;
 }
 
 async function init() {
-  const ids = getIds();
-  await renderTaxis(ids);
-  await loadAlerts();
+  initMap();
+  await refreshAll();
 
-  // start loop
-  const sec = Math.max(1, parseInt(qs('#interval').value || '1', 10));
-  if (refreshHandle) clearInterval(refreshHandle);
-  refreshHandle = setInterval(async () => {
-    const idsNow = getIds();
-    await Promise.all([refreshTaxis(idsNow), loadAlerts()]);
-    setStatus(`Last update: ${new Date().toLocaleTimeString()}`);
-  }, sec * 1000);
+  // Apply button and Loop configuration
+  const btn = qs('#btn-apply');
+  if(btn) btn.addEventListener('click', () => {
+     if (refreshHandle) clearInterval(refreshHandle);
+     startLoop();
+  });
+
+  startLoop();
 }
 
-qs('#apply').addEventListener('click', init);
+function startLoop() {
+  const inputRate = qs('#refresh-rate');
+  const sec = inputRate ? Math.max(0.5, parseFloat(inputRate.value)) : 1;
+  refreshHandle = setInterval(refreshAll, sec * 1000);
+}
 
-// initial run
-init().catch(err => setStatus(`Error: ${err.message}`));
+document.addEventListener('DOMContentLoaded', init);

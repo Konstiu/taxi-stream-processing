@@ -1,63 +1,57 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Taxi Monitor</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="preconnect" href="/" />
-  <link rel="stylesheet" href="/styles.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taxi Monitor</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+
+    <link rel="stylesheet" href="styles.css">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script src="app.js" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">🚖 Taxi Monitor</div>
-    <div class="actions">
-      <div class="input-group">
-        <label for="ids">Taxi IDs</label>
-        <input id="ids" type="text" placeholder="e.g. 100,10001,10004" value="100" />
-      </div>
-      <div class="input-group">
-        <label for="interval">Refresh (s)</label>
-        <input id="interval" type="number" min="1" value="1" />
-      </div>
-      <button id="apply">Apply</button>
-    </div>
-  </header>
+    <header class="top-bar">
+        <div class="brand">
+            <h1>Taxi Monitor</h1>
+        </div>
+        <div class="controls">
+            <label>Refresh (s) <input type="number" id="refresh-rate" value="1" min="0.5" step="0.5"></label>
+            <button id="btn-apply">Apply</button>
+        </div>
+    </header>
 
-  <main class="container">
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Live Taxis</h2>
-        <div class="sub">Color shows proximity to center: green &lt;= 10 km, amber 10–15 km, red &gt; 15 km.</div>
-      </div>
-      <div id="taxis" class="card-grid"></div>
-    </section>
+    <main class="container">
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Real-time Map</h2>
+                <div class="sub">Beijing (Forbidden City Center)</div>
+            </div>
+            <div id="map-container" style="height: 500px; width: 100%; background-color: #eee; border-radius: 0 0 4px 4px;"></div>
+        </section>
 
-    <section class="panel">
-      <div class="panel-head">
-        <h2>Alerts</h2>
-        <div class="sub">Streaming from <code>LRANGE alerts 0 -1</code> (latest first)</div>
-      </div>
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Taxi</th>
-              <th>Type</th>
-              <th>Value</th>
-              <th class="hide-sm">Raw</th>
-            </tr>
-          </thead>
-          <tbody id="alertsBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Live Taxis</h2>
+                <div class="sub">Color shows proximity to center: green &lt;= 10km, amber 10-15km, red &gt; 15km.</div>
+            </div>
+            <div id="taxis" class="grid">
+                </div>
+        </section>
 
-  <footer class="footer">
-    <span id="status">Ready</span>
-  </footer>
-
-  <script src="/app.js" defer></script>
+        <section class="panel">
+            <div class="panel-head">
+                <h2>Alerts</h2>
+                <div class="sub">Streaming from LRANGE alerts 0-9 (latest first)</div>
+            </div>
+            <ul id="alerts-list" class="list">
+                </ul>
+        </section>
+    </main>
 </body>
 </html>
