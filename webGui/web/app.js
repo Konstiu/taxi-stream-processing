@@ -8,6 +8,112 @@ const api = {
 const DEFAULT_IDS = ["100", "10002", "10004", "200"]; 
 let refreshHandle = null;
 
+// ---------- Watchlist Management ----------
+let watchlist = [...DEFAULT_IDS]; // Start with defaults
+
+function loadWatchlistFromStorage() {
+  const saved = localStorage.getItem('taxiWatchlist');
+  if (saved) {
+    try {
+      watchlist = JSON.parse(saved);
+    } catch (e) {
+      watchlist = [...DEFAULT_IDS];
+    }
+  }
+}
+
+function saveWatchlistToStorage() {
+  localStorage.setItem('taxiWatchlist', JSON.stringify(watchlist));
+}
+
+function addToWatchlist(id) {
+  const cleanId = String(id).trim();
+  if (!cleanId) return false;
+  if (watchlist.includes(cleanId)) {
+    // Already in watchlist - flash the tag to indicate
+    const existingTag = document.querySelector(`[data-taxi-id="${cleanId}"]`);
+    if (existingTag) {
+      existingTag.classList.add('flash');
+      setTimeout(() => existingTag.classList.remove('flash'), 600);
+    }
+    return false;
+  }
+  watchlist.push(cleanId);
+  saveWatchlistToStorage();
+  renderWatchlistTags();
+  refreshAll(); // Immediately fetch data for new taxi
+  return true;
+}
+
+function removeFromWatchlist(id) {
+  const idx = watchlist.indexOf(String(id));
+  if (idx > -1) {
+    watchlist.splice(idx, 1);
+    saveWatchlistToStorage();
+    renderWatchlistTags();
+    
+    // Remove card and marker
+    const card = qs(`#taxi-${id}`);
+    if (card) card.remove();
+    if (markers[id]) {
+      map.removeLayer(markers[id]);
+      delete markers[id];
+    }
+  }
+}
+
+function clearWatchlist() {
+  // Remove all markers
+  watchlist.forEach(id => {
+    if (markers[id]) {
+      map.removeLayer(markers[id]);
+      delete markers[id];
+    }
+  });
+  
+  watchlist = [];
+  saveWatchlistToStorage();
+  renderWatchlistTags();
+  
+  // Clear taxi cards
+  const taxiContainer = qs('#taxis');
+  if (taxiContainer) taxiContainer.innerHTML = '';
+}
+
+function renderWatchlistTags() {
+  const container = qs('#watchlist-tags');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  if (watchlist.length === 0) {
+    container.innerHTML = '<span class="empty-watchlist">No taxis tracked</span>';
+    return;
+  }
+  
+  watchlist.forEach(id => {
+    const tag = document.createElement('span');
+    tag.className = 'watchlist-tag';
+    tag.dataset.taxiId = id;
+    tag.innerHTML = `
+      <span class="tag-id">${id}</span>
+      <button class="tag-remove" title="Remove from watchlist">×</button>
+    `;
+    tag.querySelector('.tag-remove').addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeFromWatchlist(id);
+    });
+    tag.addEventListener('click', () => {
+      // Center map on this taxi if marker exists
+      if (markers[id]) {
+        map.setView(markers[id].getLatLng(), 14);
+        markers[id].openPopup();
+      }
+    });
+    container.appendChild(tag);
+  });
+}
+
 // ---------- Utilities ----------
 const qs = (s, el = document) => el.querySelector(s);
 
@@ -161,6 +267,8 @@ function renderAlerts(items) {
     const li = document.createElement('li');
     li.className = 'alert-item';
     const typeClass = a.type === 'speeding' ? 'tag-red' : 'tag-amber';
+    const isTracked = watchlist.includes(String(a.taxi_id));
+    
     li.innerHTML = `
       <div class="alert-time">${tsfmt(a.timestamp)}</div>
       <div class="alert-content">
@@ -168,7 +276,29 @@ function renderAlerts(items) {
         <span class="tag ${typeClass}">${a.type}</span>
         <span class="alert-val">${a.value ? parseFloat(a.value).toFixed(2) : ''}</span>
       </div>
+      <button class="btn-track ${isTracked ? 'tracked' : ''}" title="${isTracked ? 'Already tracking' : 'Add to Watchlist'}">
+        ${isTracked ? '✓ Tracking' : '+ Track'}
+      </button>
     `;
+    
+    // Click on alert to add taxi to watchlist
+    const trackBtn = li.querySelector('.btn-track');
+    trackBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!isTracked) {
+        addToWatchlist(a.taxi_id);
+        trackBtn.textContent = '✓ Tracking';
+        trackBtn.classList.add('tracked');
+        trackBtn.title = 'Already tracking';
+      } else {
+        // If already tracked, center map on taxi
+        if (markers[a.taxi_id]) {
+          map.setView(markers[a.taxi_id].getLatLng(), 14);
+          markers[a.taxi_id].openPopup();
+        }
+      }
+    });
+    
     list.appendChild(li);
   });
 }
@@ -235,15 +365,15 @@ function connectWs() {
 
 // ---------- Main Loop ----------
 function getIds() {
-  const input = qs('#ids'); // Hidden or visible input depending on design
-  // If there is no input or it is empty, use the defaults
-  if (input && input.value.trim()) {
-      return input.value.split(',').map(s => s.trim()).filter(Boolean);
-  }
-  return DEFAULT_IDS;
+  // Return the active watchlist
+  return watchlist.length > 0 ? [...watchlist] : [];
 }
 
 async function init() {
+  // Load saved watchlist
+  loadWatchlistFromStorage();
+  renderWatchlistTags();
+  
   initMap();
   connectWs();
   await refreshAll();
@@ -254,6 +384,39 @@ async function init() {
      if (refreshHandle) clearInterval(refreshHandle);
      startLoop();
   });
+  
+  // Watchlist controls
+  const addBtn = qs('#btn-add-watchlist');
+  const addInput = qs('#watchlist-input');
+  
+  if (addBtn && addInput) {
+    addBtn.addEventListener('click', () => {
+      const id = addInput.value.trim();
+      if (id) {
+        addToWatchlist(id);
+        addInput.value = '';
+      }
+    });
+    
+    addInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const id = addInput.value.trim();
+        if (id) {
+          addToWatchlist(id);
+          addInput.value = '';
+        }
+      }
+    });
+  }
+  
+  const clearBtn = qs('#btn-clear-watchlist');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      if (confirm('Clear all taxis from watchlist?')) {
+        clearWatchlist();
+      }
+    });
+  }
 
   startLoop();
 }

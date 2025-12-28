@@ -29,8 +29,20 @@
             <h1>Taxi Monitor</h1>
         </div>
         <div class="controls">
-            <label>Refresh (s) <input type="number" id="refresh-rate" value="1" min="0.5" step="0.5"></label>
-            <button id="btn-apply">Apply</button>
+            <div class="watchlist-control">
+                <label>Add Taxi ID:</label>
+                <input type="text" id="watchlist-input" placeholder="e.g. 10005" />
+                <button id="btn-add-watchlist" title="Add to Watchlist">+ Add</button>
+            </div>
+            <div class="watchlist-display">
+                <span class="watchlist-label">Watchlist:</span>
+                <div id="watchlist-tags"></div>
+                <button id="btn-clear-watchlist" title="Clear All">Clear All</button>
+            </div>
+            <div class="refresh-control">
+                <label>Refresh (s) <input type="number" id="refresh-rate" value="1" min="0.5" step="0.5"></label>
+                <button id="btn-apply">Apply</button>
+            </div>
         </div>
     </header>
 
@@ -55,7 +67,7 @@
         <section class="panel">
             <div class="panel-head">
                 <h2>Alerts</h2>
-                <div class="sub">Streaming from LRANGE alerts 0-9 (latest first)</div>
+                <div class="sub">Click an alert to add taxi to Watchlist • Real-time streaming</div>
             </div>
             <ul id="alerts-list" class="list">
                 </ul>

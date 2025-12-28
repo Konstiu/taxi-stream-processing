@@ -68,3 +68,212 @@ button:active{transform:translateY(1px)}
 
 .footer{display:flex; justify-content:center; padding:12px; color:var(--muted)}
 code{background:#0f1530; padding:2px 6px; border-radius:6px}
+
+/* ---------- Watchlist Styles ---------- */
+.top-bar .controls {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.watchlist-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.watchlist-control label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.watchlist-control input {
+  width: 100px;
+  padding: 6px 10px;
+}
+
+.watchlist-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 400px;
+}
+
+.watchlist-label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+#watchlist-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 60px;
+  overflow-y: auto;
+}
+
+.watchlist-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--badge-bg);
+  color: var(--badge);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.watchlist-tag:hover {
+  background: #2a3560;
+  border-color: var(--ok-accent);
+}
+
+.watchlist-tag.flash {
+  animation: tagFlash 0.6s ease;
+}
+
+@keyframes tagFlash {
+  0%, 100% { background: var(--badge-bg); }
+  50% { background: var(--warn-accent); }
+}
+
+.watchlist-tag .tag-id {
+  font-weight: 600;
+}
+
+.watchlist-tag .tag-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.watchlist-tag .tag-remove:hover {
+  color: var(--disc-accent);
+}
+
+.empty-watchlist {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.refresh-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#btn-add-watchlist {
+  background: var(--ok-accent);
+  border-color: var(--ok-accent);
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+#btn-add-watchlist:hover {
+  background: #2dc07a;
+}
+
+#btn-clear-watchlist {
+  background: transparent;
+  border-color: var(--muted);
+  color: var(--muted);
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+#btn-clear-watchlist:hover {
+  border-color: var(--disc-accent);
+  color: var(--disc-accent);
+}
+
+/* ---------- Alert Track Button ---------- */
+.alert-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+
+.alert-item:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+.alert-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-track {
+  background: #182045;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-track:hover {
+  background: var(--ok-accent);
+  border-color: var(--ok-accent);
+  color: #fff;
+}
+
+.btn-track.tracked {
+  background: transparent;
+  border-color: var(--ok-accent);
+  color: var(--ok-accent);
+  cursor: pointer;
+}
+
+.btn-track.tracked:hover {
+  background: var(--ok-accent);
+  color: #fff;
+}
+
+.tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.tag-red {
+  background: var(--disc);
+  color: var(--disc-accent);
+}
+
+.tag-amber {
+  background: var(--warn);
+  color: var(--warn-accent);
+}
+
+.alert-time {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 80px;
+}
+
+.alert-val {
+  font-size: 12px;
+  color: var(--muted);
+}
