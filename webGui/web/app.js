@@ -140,6 +140,14 @@ let map = null;
 const markers = {}; // Cache: { id: LeafletMarker }
 const FC_COORDS = [39.9163, 116.3972]; // Forbidden City
 
+// Custom taxi icon
+const taxiIcon = L.icon({
+  iconUrl: 'taxi-icon.png', 
+  iconSize: [32, 32],     
+  iconAnchor: [16, 32],   
+  popupAnchor: [0, -32]   
+});
+
 function initMap() {
   if (map) return;
 
@@ -175,8 +183,8 @@ function updateMarker(id, data) {
     markers[id].setLatLng([lat, lon]);
     markers[id].setPopupContent(`<b>Taxi ${id}</b><br>${st.label}<br>Speed: ${speed.toFixed(1)} km/h`);
   } else {
-    // CREATE: New marker
-    const m = L.marker([lat, lon]).addTo(map);
+    // CREATE: New marker with taxi icon
+    const m = L.marker([lat, lon], { icon: taxiIcon }).addTo(map);
     m.bindPopup(`<b>Taxi ${id}</b><br>${st.label}<br>Speed: ${speed.toFixed(1)} km/h`);
     markers[id] = m;
   }
