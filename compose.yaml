@@ -61,7 +61,6 @@ services:
       LINGER_MS: "50"
       BATCH_BYTES: "65536"
       MAX_FILES: "0"
-    # ✅ run python directly; map your current envs to flags your script understands
     command: [
       "--glob","/data/*.txt",
       "--bootstrap","broker:29092",
@@ -69,7 +68,7 @@ services:
       "--compression","lz4",
       "--linger-ms","80",
       "--batch-bytes","262144",
-      "--max-files","10",
+      "--max-files","0",
       "--pace","0.001",
     ]
     restart: "no"  # optional web UI
