@@ -7,7 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY bulk_producer.py .
 ENTRYPOINT [ "python", "/app/bulk_producer.py" ]
 
-# read config from env; defaults are set in docker-compose
 ENV BOOTSTRAP=broker:29092 \
 	TOPIC=taxi-locations \
 	GLOB=/data/**/*.txt \
@@ -17,12 +16,3 @@ ENV BOOTSTRAP=broker:29092 \
 	BATCH_BYTES=65536 \
 	MAX_FILES=0
 
-#CMD ["bash", "-lc", "python /app/bulk_producer.py \
-#	--bootstrap \"$BOOTSTRAP\" \
-#	--topic \"$TOPIC\" \
-#	--glob \"$GLOB\" \
-#	--speedup \"$SPEEDUP\" \
-#	--compression \"$COMPRESSION\" \
-#	--linger-ms \"$LINGER_MS\" \
-#	--batch-bytes \"$BATCH_BYTES\" \
-#	--max-files \"$MAX_FILES\" "]

@@ -21,7 +21,6 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
-      # (optional) allow implicit topic creation; we still create explicitly below
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     healthcheck:
       test: ["CMD", "bash", "-lc", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
@@ -54,7 +53,6 @@ services:
     environment:
       BOOTSTRAP: broker:29092
       TOPIC: taxi-locations
-      # keep if your script reads envs; otherwise flags below rule
       GLOB: /data/*.txt
       SPEEDUP: "0"
       COMPRESSION: lz4
@@ -71,7 +69,7 @@ services:
       "--max-files","0",
       "--pace","0.001",
     ]
-    restart: "no"  # optional web UI
+    restart: "no"
 
 
   kafka-ui:
@@ -83,35 +81,6 @@ services:
     ports:
       - "8085:8080"
     restart: unless-stopped
-
-
-
-
-  
-# ================================================================
-  # 🗄️ Optional: Local SQL database (uncomment to enable)
-  # Files expected under ./sql-database/{.env, init/01_schema.sql, loader/loader.sh}
-  # Data files stay in ./data (already mounted above)
-  # ================================================================
-
-#  postgres:
-#    image: postgres:16
-#    restart: unless-stopped
-#    env_file: ./sql-database/.env   # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
-#    ports:
-#      - "5432:5432"                  # connect from host via localhost:5432
-#
-#  csv_loader:
-#    image: postgres:16
-#    depends_on:
-#      - postgres
-#    env_file: ./sql-database/.env
-#    volumes:
-#      - ./sql-database/loader/loader.sh:/loader.sh:ro
-#      - ./data:/data:ro
-#    entrypoint: ["bash", "/loader.sh"]
-#    restart: "no"
-
 
 
     # ==============================#

@@ -28,7 +28,7 @@ import static com.example.TaxiTopology.SpeedBolt.haversineMeters;
 
 public class TaxiTopology {
 
-    // ✅ Kafka Spout
+    // Kafka Spout
     private static KafkaSpout<String, String> buildKafkaSpout(String brokers, String topic, String group) {
         KafkaSpoutConfig<String, String> cfg =
                 KafkaSpoutConfig.builder(brokers, topic)
@@ -47,7 +47,7 @@ public class TaxiTopology {
 
 
 
-    // ✅ Parse JSON Bolt
+    // Parse JSON Bolt
     public static class ParseJsonBolt extends BaseBasicBolt {
         private transient ObjectMapper mapper;
 
@@ -77,7 +77,7 @@ public class TaxiTopology {
         }
     }
 
-    // ✅ Redis Bolt
+    // Redis Bolt
     public static class RedisBolt extends org.apache.storm.topology.base.BaseRichBolt {
         private transient org.apache.storm.task.OutputCollector collector;
         private transient JedisPool pool;
@@ -224,7 +224,7 @@ public class TaxiTopology {
 
 
 
-    // ✅ Compute speed between consecutive GPS fixes
+    // Compute speed between consecutive GPS fixes
     public static class SpeedBolt extends BaseBasicBolt {
         // previous state per taxiId (in-memory)
 		private static final Logger LOG = LoggerFactory.getLogger(SpeedBolt.class);
@@ -266,7 +266,7 @@ public class TaxiTopology {
                     double km = distMeters / 1000.0;
                     speedKmh = km / dtHours;
 
-                    // simple sanity cap to filter out GPS jumps; tune as needed
+                    // simple sanity cap to filter out GPS jumps
                     //if (speedKmh < 0 || speedKmh > 200.0) speedKmh = 0.0;
                 }
             }
@@ -285,7 +285,7 @@ public class TaxiTopology {
         // Forbidden City (Beijing) center
         public static final double FC_LAT = 39.9163;
         public static final double FC_LON = 116.3972;
-        // ✅ Haversine distance in meters
+        // Haversine distance in meters
         static double haversineMeters(double lat1, double lon1, double lat2, double lon2) {
             double R = 6378137; // Earth radius (m)
             double dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
