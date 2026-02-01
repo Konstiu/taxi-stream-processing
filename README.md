@@ -33,6 +33,15 @@ mkdir -p data
 # Add your CSV files here
 ```
 
+#### Download sample data (T-Drive)
+
+You can download a real-world taxi trajectory dataset from Microsoft Research (T-Drive):
+
+* Dataset page: [https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/](https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/)
+
+After downloading, extract the files and place the trajectory files into the local `data/` directory so the feeder can ingest them.
+
+
 ### 2. Start All Services
 
 To start all services, run:
