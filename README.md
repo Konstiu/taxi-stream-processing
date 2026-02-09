@@ -2,6 +2,13 @@
 
 A distributed real-time data streaming and processing system for analyzing taxi location data using Apache Kafka, Apache Storm, and Redis, with a modern web dashboard for visualization.
 
+## 🎥 Live Demo
+
+![Real-Time Taxi Stream Processing System](demo/demo.gif)
+
+🎬 **Full demo video (HD):**  
+<https://unterweger.tech/assets/vid/Taxi_Video.mp4>
+
 ## 🏗️ System Architecture
 
 The system consists of four main components:
@@ -37,10 +44,9 @@ mkdir -p data
 
 You can download a real-world taxi trajectory dataset from Microsoft Research (T-Drive):
 
-* Dataset page: [https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/](https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/)
+- Dataset page: [https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/](https://www.microsoft.com/en-us/research/publication/t-drive-trajectory-data-sample/)
 
 After downloading, extract the files and place the trajectory files into the local `data/` directory so the feeder can ingest them.
-
 
 ### 2. Start All Services
 
@@ -51,6 +57,7 @@ docker compose up --build -d
 ```
 
 This will:
+
 - Start Kafka broker and topic initialization
 - Start the feeder service (reads data from `data/` folder into Kafka)
 - Start Storm topology for stream processing
