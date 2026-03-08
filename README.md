@@ -7,7 +7,7 @@ A distributed real-time data streaming and processing system for analyzing taxi 
 ![Real-Time Taxi Stream Processing System](demo/demo.gif)
 
 🎬 **Full demo video (HD):**  
-<https://unterweger.tech/assets/vid/Taxi_Video.mp4>
+<https://unterweger.tech/old/assets/vid/Taxi_Video.mp4>
 
 ## 🏗️ System Architecture
 
